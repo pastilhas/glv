@@ -8,19 +8,20 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509_vfy.h>
+#include <pwd.h>
 #include <resolv.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #define GEMINI_PORT 1965
-#define MAX_BODY_SIZE 65536
 #define MAX_HOSTNAME 256
 #define MAX_REQUEST 1024
 #define MAX_HEADER_SIZE 1024
 #define INITIAL_BUFFER_SIZE 1024
-#define KNOWN_HOSTS_FILE "~/.gemini_hosts"
+#define KNOWN_HOSTS_FILE ".gemini_hosts"
 
 typedef struct {
   SSL_CTX *ctx;
@@ -39,7 +40,7 @@ typedef struct {
 typedef struct {
   char host[256];
   unsigned char fingerprint[32];
-  char expiry[64];
+  char expiry[32];
 } CertificateInfo;
 
 int fetch(const char *url, Response *response);

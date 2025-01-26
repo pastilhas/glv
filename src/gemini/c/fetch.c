@@ -1,7 +1,4 @@
 #include "fetch.h"
-#include <openssl/asn1.h>
-#include <openssl/crypto.h>
-#include <string.h>
 
 int fetch(const char *url, Response *response) {
   Connection conn;
@@ -25,21 +22,37 @@ int fetch(const char *url, Response *response) {
     return -1;
   }
 
-  if (read_cert_info(KNOWN_HOSTS_FILE, hostname, &old) == 0) {
+  const char *homedir;
+  if ((homedir = getenv("HOME")) == NULL) {
+    homedir = getpwuid(getuid())->pw_dir;
+  }
+
+  int len1 = strlen(homedir);
+  int len2 = strlen(KNOWN_HOSTS_FILE);
+  int len = len1 + len2 + (homedir[len1 - 1] != '/' ? 1 : 0) + 1;
+
+  char *path = malloc(len);
+  snprintf(path, len, "%s%s%s", homedir, homedir[len1 - 1] != '/' ? "/" : "",
+           KNOWN_HOSTS_FILE);
+
+  if (read_cert_info(path, hostname, &old) == 0) {
     int pday, psec;
     ASN1_TIME expiry;
     ASN1_TIME_set_string(&expiry, new.expiry);
     ASN1_TIME_diff(&pday, &psec, NULL, &expiry);
 
     if (pday < 0 && psec < 0) {
-      write_cert_info(KNOWN_HOSTS_FILE, &new);
-    } else if (strcmp((char *)new.fingerprint, (char *)old.fingerprint)) {
+      write_cert_info(path, &new);
+    } else if (memcmp(new.fingerprint, old.fingerprint,
+                      sizeof(old.fingerprint))) {
       cleanup(&conn);
       return -1;
     }
   } else {
-    write_cert_info(KNOWN_HOSTS_FILE, &new);
+    write_cert_info(path, &new);
   }
+
+  free(path);
 
   snprintf(request, sizeof(request), "%s\r\n", url);
 
@@ -195,14 +208,20 @@ int get_cert_info(SSL *ssl, CertificateInfo *info) {
   ASN1_TIME *expiry = X509_get_notAfter(cert);
   BIO *bio = BIO_new(BIO_s_mem());
   if (ASN1_TIME_print(bio, expiry)) {
-    BUF_MEM *buf;
-    BIO_get_mem_ptr(bio, &buf);
-    strncpy(info->expiry, buf->data, sizeof(info->expiry) - 1);
-    info->expiry[sizeof(info->expiry) - 1] = '\0';
+      BUF_MEM *buf;
+      BIO_get_mem_ptr(bio, &buf);
+      struct tm tm;
+      memset(&tm, 0, sizeof(tm));
+      if (strptime(buf->data, "%b %d %H:%M:%S %Y %Z", &tm)) {
+          strftime(info->expiry, sizeof(info->expiry), "%Y%m%d%H%M%SZ", &tm);
+      } else {
+          strcpy(info->expiry, "Unknown");
+      }
   } else {
-    strcpy(info->expiry, "Unknown");
+      strcpy(info->expiry, "Unknown");
   }
   BIO_free(bio);
+
 
   X509_free(cert);
   return 0;
@@ -238,6 +257,8 @@ int read_cert_info(const char *filename, const char *host,
                    CertificateInfo *info) {
   FILE *fp = fopen(filename, "r");
   if (fp == NULL) {
+    FILE *fp = fopen(filename, "w");
+    fclose(fp);
     return -1;
   }
 
