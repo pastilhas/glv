@@ -8,17 +8,17 @@ import arrays
 #include "fetch.h"
 
 @[typedef]
-struct C.GeminiResponse {
-	status_code int
-	meta_length int
-	body_length int
-	meta        charptr
-	body        charptr
+struct C.Response {
+	code     int
+	meta_len int
+	body_len int
+	meta     charptr
+	body     charptr
 }
 
-fn C.fetch(url charptr, response &C.GeminiResponse) int
+fn C.fetch(url charptr, response &C.Response) int
 
-fn C.free_reponse(response &C.GeminiResponse)
+fn C.free_reponse(response &C.Response)
 
 pub struct Response {
 pub:
@@ -28,16 +28,16 @@ pub:
 }
 
 pub fn fetch(url string) ?Response {
-	mut c_response := &C.GeminiResponse{}
-	code := C.fetch(url.str, c_response)
+	mut cres := &C.Response{}
+	code := C.fetch(url.str, cres)
 
 	if code < 0 {
+		C.free_reponse(cres)
 		return none
 	}
 
-	mut meta := unsafe { arrays.carray_to_varray[u8](c_response.meta, c_response.meta_length) }
-	mut body := unsafe { arrays.carray_to_varray[u8](c_response.body, c_response.body_length) }
-	C.free_reponse(c_response)
+	mut meta := unsafe { arrays.carray_to_varray[u8](cres.meta, cres.meta_len) }
+	mut body := unsafe { arrays.carray_to_varray[u8](cres.body, cres.body_len) }
 
 	return Response{code, meta.bytestr(), body}
 }
