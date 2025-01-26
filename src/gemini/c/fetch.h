@@ -18,6 +18,12 @@
 #define MAX_HEADER_SIZE 1024
 
 typedef struct {
+  SSL_CTX *ctx;
+  SSL *ssl;
+  int sock;
+} Connection;
+
+typedef struct {
   int status_code;
   int meta_length;
   int body_length;
@@ -27,7 +33,11 @@ typedef struct {
 
 int fetch(const char *url, GeminiResponse *response);
 
-void cleanup(SSL_CTX *ctx, SSL *ssl, int conn);
+int setup_connect(char *hostname, Connection *conn);
+
+int read_header(Connection *conn, GeminiResponse *response);
+
+void cleanup(Connection *conn);
 
 void free_reponse(GeminiResponse *response);
 
