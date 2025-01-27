@@ -19,11 +19,9 @@
 #define OK 0
 #define FAIL -1
 #define GEMINI_PORT 1965
-#define MAX_HOSTNAME 256
 #define MAX_REQUEST 1024
 #define MAX_HEADER_SIZE 1024
 #define INITIAL_BUFFER_SIZE 1024
-#define KNOWN_HOSTS_FILE ".gemini_hosts"
 
 typedef struct {
   SSL_CTX *ctx;
@@ -40,16 +38,13 @@ typedef struct {
 } Response;
 
 typedef struct {
-  char host[256];
-  unsigned char fingerprint[32];
-  char expiry[32];
+  char fingerprint[32];
+  char expiry[16];
 } CertificateInfo;
 
 typedef struct tm tm_t;
 
 char *strptime(const char *__restrict s, const char *__restrict fmt, tm_t *tp);
-
-int fetch(const char *url, Response *response);
 
 /**
  * Set up a TLS connection to a Gemini server.
@@ -60,6 +55,26 @@ int fetch(const char *url, Response *response);
  * @return 0 on success, -1 on failure
  */
 int setup_connect(char *hostname, Connection *conn);
+
+/**
+ * Get certificate information from an SSL connection.
+ * Retrieves the server's certificate fingerprint and expiry date.
+ *
+ * @param ssl The SSL connection to get certificate info from
+ * @param info The CertificateInfo struct to populate
+ * @return 0 on success, -1 on failure
+ */
+int get_server_cert_info(Connection *conn, CertificateInfo *info);
+
+/**
+ * Write a request URL to a Gemini connection.
+ * Formats and sends the URL according to the Gemini protocol spec.
+ *
+ * @param conn The Connection struct containing the SSL connection
+ * @param url The URL to send in the request
+ * @return 0 on success, -1 on failure
+ */
+int write_request(Connection *conn, char *url);
 
 /**
  * Read the response header from a Gemini connection.
@@ -99,20 +114,5 @@ void free_connection(Connection *conn);
  * @param response The Response struct to cleanup
  */
 void free_reponse(Response *response);
-
-/**
- * Get certificate information from an SSL connection.
- * Retrieves the server's certificate fingerprint and expiry date.
- *
- * @param ssl The SSL connection to get certificate info from
- * @param info The CertificateInfo struct to populate
- * @return 0 on success, -1 on failure
- */
-int get_server_cert_info(SSL *ssl, CertificateInfo *info);
-
-int write_cert_info(const char *filename, const CertificateInfo *info);
-
-int read_cert_info(const char *filename, const char *host,
-                   CertificateInfo *info);
 
 #endif
