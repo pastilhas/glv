@@ -35,6 +35,30 @@ int get_server_cert_info(Connection *conn, CertificateInfo *info) {
     return FAIL;
   }
 
+  const X509_NAME *subject = X509_get_subject_name(cert);
+  const int nid = X509_NAME_get_index_by_NID(subject, NID_commonName, -1);
+  if (nid < 0) {
+    X509_free(cert);
+    return FAIL;
+  }
+
+  const ASN1_STRING *data =
+      X509_NAME_ENTRY_get_data(X509_NAME_get_entry(subject, nid));
+  if (!data) {
+    X509_free(cert);
+    return FAIL;
+  }
+
+  uint8_t *hostname;
+  int length = ASN1_STRING_to_UTF8(&hostname, data);
+  if (length < 0) {
+    X509_free(cert);
+    return FAIL;
+  }
+
+  strncpy(info->hostname, (char *)hostname, length);
+  free(hostname);
+
   uint32_t n;
   if (!X509_digest(cert, EVP_sha256(), (uint8_t *)info->fingerprint, &n)) {
     X509_free(cert);

@@ -4,7 +4,9 @@
 #include <malloc.h>
 #include <netdb.h>
 #include <openssl/asn1.h>
+#include <openssl/crypto.h>
 #include <openssl/err.h>
+#include <openssl/obj_mac.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509_vfy.h>
@@ -39,6 +41,7 @@ typedef struct {
 } Response;
 
 typedef struct {
+  char hostname[256];
   char fingerprint[32];
   char expiry[16];
 } CertificateInfo;
