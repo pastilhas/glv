@@ -1,7 +1,7 @@
 module gemini
 
 import arrays
-import net.urllib
+import net.urllib { URL }
 import time
 
 pub struct Response {
@@ -39,9 +39,39 @@ pub fn Certificate.from(info &C.CertificateInfo) !Certificate {
 	}
 }
 
-pub fn fetch(url string) !Response {
-	url_obj := urllib.parse(url) or { return error('Error parsing url ${err}') }
+pub fn parse_url(raw string) !URL {
+	mut url := urllib.parse(raw)!
 
+	if url.scheme == '' {
+		url.scheme = 'gemini'
+	} else if url.scheme != 'gemini' {
+		return error('Scheme must be gemini:// in ${raw}')
+	}
+
+	if '${*url.user}' != '' {
+		return error('Gemini does not support user info in URL')
+	}
+
+	if url.host == '' {
+		return error('No host defined')
+	}
+
+	if host, port := url.host.rsplit_once(':') {
+		if port.int() == 1965 {
+			url.host = host
+		}
+	}
+
+	if !url.path.starts_with('/') {
+		url.path = '/${url.path}'
+	}
+
+	url.raw_query = urllib.path_escape(url.raw_query)
+
+	return url
+}
+
+pub fn fetch(url URL) !Response {
 	mut conn := &C.Connection{}
 	mut cres := &C.Response{}
 	mut ccert := &C.CertificateInfo{}
@@ -51,7 +81,7 @@ pub fn fetch(url string) !Response {
 		C.free_reponse(cres)
 	}
 
-	mut res := C.setup_connect(url_obj.hostname().str, conn)
+	mut res := C.setup_connect(url.hostname().str, conn)
 	if res == -1 {
 		return error('Error connecting to server')
 	}
@@ -62,7 +92,7 @@ pub fn fetch(url string) !Response {
 	}
 
 	mut new := Certificate.from(ccert) or { return error('Error parsing url ${err}') }
-	if old := get_certificate(url_obj.hostname()) {
+	if old := get_certificate(url.hostname()) {
 		res = cmp_certificates(old, new)
 		if res < 0 {
 			return error('Error comparing certificates')
@@ -71,10 +101,10 @@ pub fn fetch(url string) !Response {
 			set_certificate(new) or { return error('Error replacing certificate') }
 		}
 	} else {
-		add_certificate(url_obj.hostname(), new) or { return error('Error adding new certificate') }
+		add_certificate(url.hostname(), new) or { return error('Error adding new certificate') }
 	}
 
-	res = C.write_request(conn, url_obj.str().str)
+	res = C.write_request(conn, url.str().str)
 	if res == -1 {
 		return error('Error writing request to server')
 	}
