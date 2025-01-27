@@ -1,4 +1,5 @@
 #include "fetch.h"
+#include <time.h>
 
 int fetch(const char *url, Response *response) {
   Connection conn;
@@ -6,20 +7,20 @@ int fetch(const char *url, Response *response) {
   char hostname[MAX_HOSTNAME], request[MAX_REQUEST];
 
   if (sscanf(url, "gemini://%255[^/]", hostname) != 1) {
-    return -1;
+    return FAIL;
   }
 
   if (setup_connect(hostname, &conn) < 0) {
-    cleanup(&conn);
-    return -1;
+    free_connection(&conn);
+    return FAIL;
   }
 
   CertificateInfo new, old;
   strncpy(new.host, hostname, sizeof(new.host) - 1);
   new.host[sizeof(new.host) - 1] = '\0';
-  if (get_cert_info(conn.ssl, &new)) {
-    cleanup(&conn);
-    return -1;
+  if (get_server_cert_info(conn.ssl, &new)) {
+    free_connection(&conn);
+    return FAIL;
   }
 
   const char *homedir;
@@ -45,8 +46,8 @@ int fetch(const char *url, Response *response) {
       write_cert_info(path, &new);
     } else if (memcmp(new.fingerprint, old.fingerprint,
                       sizeof(old.fingerprint))) {
-      cleanup(&conn);
-      return -1;
+      free_connection(&conn);
+      return FAIL;
     }
   } else {
     write_cert_info(path, &new);
@@ -57,21 +58,21 @@ int fetch(const char *url, Response *response) {
   snprintf(request, sizeof(request), "%s\r\n", url);
 
   if (SSL_write(conn.ssl, request, strlen(request)) <= 0) {
-    cleanup(&conn);
-    return -1;
+    free_connection(&conn);
+    return FAIL;
   }
 
-  if (read_header(&conn, response)) {
-    cleanup(&conn);
-    return -1;
+  if (read_header(&conn, response) < 0) {
+    free_connection(&conn);
+    return FAIL;
   }
 
   if (response->code / 10 == 2 && read_body(&conn, response)) {
-    cleanup(&conn);
-    return -1;
+    free_connection(&conn);
+    return FAIL;
   }
 
-  cleanup(&conn);
+  free_connection(&conn);
   return response->code;
 }
 
@@ -87,7 +88,7 @@ int setup_connect(char *hostname, Connection *conn) {
   conn->sock = socket(AF_INET, SOCK_STREAM, 0);
   host = gethostbyname(hostname);
   if (!host) {
-    return -1;
+    return FAIL;
   }
 
   memset(&addr, 0, sizeof(addr));
@@ -96,32 +97,17 @@ int setup_connect(char *hostname, Connection *conn) {
   memcpy(&addr.sin_addr, host->h_addr, host->h_length);
 
   if (connect(conn->sock, (struct sockaddr *)&addr, sizeof(addr))) {
-    return -1;
+    return FAIL;
   }
 
   SSL_set_fd(conn->ssl, conn->sock);
   SSL_set_tlsext_host_name(conn->ssl, hostname);
 
   if (SSL_connect(conn->ssl) != 1) {
-    return -1;
+    return FAIL;
   }
 
-  X509 *cert = SSL_get_peer_certificate(conn->ssl);
-  if (cert == NULL) {
-    return -1;
-  }
-
-  unsigned char fingerprint[32];
-  unsigned int n;
-  if (!X509_digest(cert, EVP_sha256(), fingerprint, &n)) {
-    return -1;
-  }
-
-  ASN1_TIME *expiryDate = X509_get_notAfter(cert);
-
-  X509_free(cert);
-
-  return 0;
+  return OK;
 }
 
 int read_header(Connection *conn, Response *response) {
@@ -132,7 +118,7 @@ int read_header(Connection *conn, Response *response) {
   while (header_pos < sizeof(header) - 1) {
     n = SSL_read(conn->ssl, &c, 1);
     if (n <= 0) {
-      return -1;
+      return FAIL;
     }
     header[header_pos++] = c;
     if (c == '\n') {
@@ -141,11 +127,11 @@ int read_header(Connection *conn, Response *response) {
   }
   response->meta = malloc(MAX_HEADER_SIZE);
   if (response->meta == NULL) {
-    return -1;
+    return FAIL;
   }
   sscanf(header, "%d %[^\r\n]", &response->code, response->meta);
   response->meta_len = strlen(response->meta);
-  return 0;
+  return response->code;
 }
 
 int read_body(Connection *conn, Response *response) {
@@ -154,7 +140,7 @@ int read_body(Connection *conn, Response *response) {
   response->body = malloc(body_size);
   response->body_len = 0;
   if (response->body == NULL) {
-    return -1;
+    return FAIL;
   }
   while (1) {
     n = SSL_read(conn->ssl, response->body + response->body_len,
@@ -166,14 +152,14 @@ int read_body(Connection *conn, Response *response) {
     if (response->body_len >= body_size - 1) {
       response->body = realloc(response->body, (body_size *= 2));
       if (response->body == NULL) {
-        return -1;
+        return FAIL;
       }
     }
   }
-  return 0;
+  return OK;
 }
 
-void cleanup(Connection *conn) {
+void free_connection(Connection *conn) {
   if (conn->ssl) {
     SSL_shutdown(conn->ssl);
     SSL_free(conn->ssl);
@@ -193,44 +179,41 @@ void free_reponse(Response *response) {
   }
 }
 
-int get_cert_info(SSL *ssl, CertificateInfo *info) {
+int get_server_cert_info(SSL *ssl, CertificateInfo *info) {
   X509 *cert = SSL_get_peer_certificate(ssl);
   if (cert == NULL) {
-    return -1;
+    return FAIL;
   }
 
   unsigned int n;
   if (!X509_digest(cert, EVP_sha256(), info->fingerprint, &n)) {
     X509_free(cert);
-    return -1;
+    return FAIL;
   }
-
   ASN1_TIME *expiry = X509_get_notAfter(cert);
   BIO *bio = BIO_new(BIO_s_mem());
   if (ASN1_TIME_print(bio, expiry)) {
-      BUF_MEM *buf;
-      BIO_get_mem_ptr(bio, &buf);
-      struct tm tm;
-      memset(&tm, 0, sizeof(tm));
-      if (strptime(buf->data, "%b %d %H:%M:%S %Y %Z", &tm)) {
-          strftime(info->expiry, sizeof(info->expiry), "%Y%m%d%H%M%SZ", &tm);
-      } else {
-          strcpy(info->expiry, "Unknown");
-      }
-  } else {
+    BUF_MEM *buf;
+    BIO_get_mem_ptr(bio, &buf);
+    tm_t tm;
+    memset(&tm, 0, sizeof(tm));
+    if (strptime(buf->data, "%b %d %H:%M:%S %Y %Z", &tm)) {
+      strftime(info->expiry, sizeof(info->expiry), "%Y%m%d%H%M%SZ", &tm);
+    } else {
       strcpy(info->expiry, "Unknown");
+    }
+  } else {
+    strcpy(info->expiry, "Unknown");
   }
   BIO_free(bio);
-
-
   X509_free(cert);
-  return 0;
+  return OK;
 }
 
 int write_cert_info(const char *filename, const CertificateInfo *info) {
   FILE *fp = fopen(filename, "a");
   if (fp == NULL) {
-    return -1;
+    return FAIL;
   }
   fprintf(fp, "%s ", info->host);
   fprintf(fp,
@@ -250,7 +233,7 @@ int write_cert_info(const char *filename, const CertificateInfo *info) {
           info->fingerprint[30], info->fingerprint[31]);
   fprintf(fp, " %s\n", info->expiry);
   fclose(fp);
-  return 0;
+  return OK;
 }
 
 int read_cert_info(const char *filename, const char *host,
@@ -259,7 +242,7 @@ int read_cert_info(const char *filename, const char *host,
   if (fp == NULL) {
     FILE *fp = fopen(filename, "w");
     fclose(fp);
-    return -1;
+    return FAIL;
   }
 
   char line[512];
@@ -287,10 +270,10 @@ int read_cert_info(const char *filename, const char *host,
       info->host[sizeof(info->host) - 1] = '\0';
 
       fclose(fp);
-      return 0;
+      return OK;
     }
   }
 
   fclose(fp);
-  return -1;
+  return FAIL;
 }

@@ -16,6 +16,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#define OK 0
+#define FAIL -1
 #define GEMINI_PORT 1965
 #define MAX_HOSTNAME 256
 #define MAX_REQUEST 1024
@@ -43,19 +45,70 @@ typedef struct {
   char expiry[32];
 } CertificateInfo;
 
+typedef struct tm tm_t;
+
+char *strptime(const char *__restrict s, const char *__restrict fmt, tm_t *tp);
+
 int fetch(const char *url, Response *response);
 
+/**
+ * Set up a TLS connection to a Gemini server.
+ * Performs DNS lookup, creates socket connection, and initializes SSL.
+ *
+ * @param hostname The hostname to connect to
+ * @param conn The Connection struct to initialize
+ * @return 0 on success, -1 on failure
+ */
 int setup_connect(char *hostname, Connection *conn);
 
+/**
+ * Read the response header from a Gemini connection.
+ * Reads the response header until a newline character is encountered.
+ * Parses the status code and meta information from the header.
+ *
+ * @param conn The Connection struct containing the SSL connection
+ * @param response The Response struct to store the header information
+ * @return 0 on success, -1 on failure
+ */
 int read_header(Connection *conn, Response *response);
 
+/**
+ * Read the response body from a Gemini connection.
+ * Dynamically allocates memory for the response body and reads
+ * data from the connection until EOF or error.
+ *
+ * @param conn The Connection struct containing the SSL connection
+ * @param response The Response struct to store the body data
+ * @return 0 on success, -1 on failure
+ */
 int read_body(Connection *conn, Response *response);
 
-void cleanup(Connection *conn);
+/**
+ * Cleanup function for a Gemini connection.
+ * Frees all resources associated with a connection including
+ * SSL context, connection, and socket.
+ *
+ * @param conn The Connection struct to cleanup
+ */
+void free_connection(Connection *conn);
 
+/**
+ * Cleanup function for a Gemini response.
+ * Frees all memory allocated for response meta and body.
+ *
+ * @param response The Response struct to cleanup
+ */
 void free_reponse(Response *response);
 
-int get_cert_info(SSL *ssl, CertificateInfo *info);
+/**
+ * Get certificate information from an SSL connection.
+ * Retrieves the server's certificate fingerprint and expiry date.
+ *
+ * @param ssl The SSL connection to get certificate info from
+ * @param info The CertificateInfo struct to populate
+ * @return 0 on success, -1 on failure
+ */
+int get_server_cert_info(SSL *ssl, CertificateInfo *info);
 
 int write_cert_info(const char *filename, const CertificateInfo *info);
 
