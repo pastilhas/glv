@@ -10,9 +10,11 @@
 #include <openssl/x509_vfy.h>
 #include <pwd.h>
 #include <resolv.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -31,7 +33,6 @@ typedef struct {
 
 typedef struct {
   int code;
-  int meta_len;
   int body_len;
   char meta[MAX_HEADER_SIZE];
   char *body;

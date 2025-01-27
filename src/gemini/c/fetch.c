@@ -1,6 +1,4 @@
 #include "fetch.h"
-#include <string.h>
-#include <time.h>
 
 int setup_connect(char *hostname, Connection *conn) {
   struct hostent *host;
@@ -28,45 +26,41 @@ int setup_connect(char *hostname, Connection *conn) {
 
   SSL_set_fd(conn->ssl, conn->sock);
   SSL_set_tlsext_host_name(conn->ssl, hostname);
-
-  if (SSL_connect(conn->ssl) != 1) {
-    return FAIL;
-  }
-
-  return OK;
+  return SSL_connect(conn->ssl) == 1 ? OK : FAIL;
 }
 
 int get_server_cert_info(Connection *conn, CertificateInfo *info) {
   X509 *cert = SSL_get_peer_certificate(conn->ssl);
-  if (cert == NULL) {
+  if (!cert) {
     return FAIL;
   }
 
-  unsigned int n;
-  if (!X509_digest(cert, EVP_sha256(), (unsigned char *)info->fingerprint,
-                   &n)) {
+  uint32_t n;
+  if (!X509_digest(cert, EVP_sha256(), (uint8_t *)info->fingerprint, &n)) {
     X509_free(cert);
     return FAIL;
   }
-  ASN1_TIME *expiry = X509_get_notAfter(cert);
+
   BIO *bio = BIO_new(BIO_s_mem());
-  if (ASN1_TIME_print(bio, expiry)) {
-    BUF_MEM *buf;
-    BIO_get_mem_ptr(bio, &buf);
-    tm_t tm;
-    memset(&tm, 0, sizeof(tm));
-    if (strptime(buf->data, "%b %d %H:%M:%S %Y %Z", &tm)) {
-      strftime(info->expiry, sizeof(info->expiry), "%Y%m%d%H%M%SZ", &tm);
-    } else {
-      BIO_free(bio);
-      X509_free(cert);
-      return FAIL;
-    }
-  } else {
+  ASN1_TIME *expiry = X509_get_notAfter(cert);
+
+  if (!ASN1_TIME_print(bio, expiry)) {
     BIO_free(bio);
     X509_free(cert);
     return FAIL;
   }
+
+  BUF_MEM *buf;
+  BIO_get_mem_ptr(bio, &buf);
+
+  tm_t tm = {0};
+  if (!strptime(buf->data, "%b %d %H:%M:%S %Y %Z", &tm) ||
+      !strftime(info->expiry, sizeof(info->expiry), "%Y%m%d%H%M%SZ", &tm)) {
+    BIO_free(bio);
+    X509_free(cert);
+    return FAIL;
+  }
+
   BIO_free(bio);
   X509_free(cert);
   return OK;
@@ -95,9 +89,7 @@ int read_header(Connection *conn, Response *response) {
       break;
     }
   }
-  memset(response->meta, 0, sizeof(response->meta));
   sscanf(header, "%d %[^\r\n]", &response->code, response->meta);
-  response->meta_len = strlen(response->meta);
   return OK;
 }
 
@@ -139,7 +131,7 @@ void free_connection(Connection *conn) {
 }
 
 void free_reponse(Response *response) {
-  if (response) {
+  if (response->body) {
     free(response->body);
   }
 }
