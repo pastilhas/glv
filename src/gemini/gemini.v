@@ -2,47 +2,7 @@ module gemini
 
 import arrays
 import net.urllib
-
-#flag -lssl -lcrypto
-#flag -I @VMODROOT/src/gemini/c
-#flag @VMODROOT/src/gemini/c/fetch.o
-#include "fetch.h"
-
-@[typedef]
-struct C.Connection {
-	ctx  voidptr
-	ssl  voidptr
-	sock int
-}
-
-@[typedef]
-struct C.Response {
-	code     int
-	meta_len int
-	body_len int
-	meta     charptr
-	body     charptr
-}
-
-@[typedef]
-struct C.CertificateInfo {
-	fingerprint [32]u8
-	expiry      [16]char
-}
-
-fn C.setup_connect(hostname charptr, conn &C.Connection) int
-
-fn C.write_request(conn &C.Connection, url charptr) int
-
-fn C.get_server_cert_info(conn &C.Connection, info &C.CertificateInfo) int
-
-fn C.read_header(conn &C.Connection, response &C.Response) int
-
-fn C.read_body(conn &C.Connection, response &C.Response) int
-
-fn C.free_connection(conn &C.Connection)
-
-fn C.free_reponse(response &C.Response)
+import time
 
 pub struct Response {
 pub:
@@ -51,12 +11,41 @@ pub:
 	body []u8
 }
 
+pub struct Certificate {
+pub:
+	hostname    string
+	fingerprint []u8
+	expiry      time.Time
+}
+
+pub fn Response.from(resp &C.Response) Response {
+	code := resp.code
+	meta := unsafe { cstring_to_vstring(resp.meta) }
+	body := unsafe { arrays.carray_to_varray[u8](resp.body, resp.body_len) }
+	return Response{
+		code: code
+		meta: meta
+		body: body
+	}
+}
+
+pub fn Certificate.from(hostname string, info &C.CertificateInfo) !Certificate {
+	fingerprint := unsafe { arrays.carray_to_varray[u8](info.fingerprint, 32) }
+	expiry_str := unsafe { cstring_to_vstring(info.expiry) }
+	expiry := time.parse_format(expiry_str, 'YYYYMMDDHHmmssZ')!
+	return Certificate{
+		hostname:    hostname
+		fingerprint: fingerprint
+		expiry:      expiry
+	}
+}
+
 pub fn fetch(url string) ?Response {
 	url_obj := urllib.parse(url) or { return none }
 
 	mut conn := &C.Connection{}
 	mut cres := &C.Response{}
-	mut cert := &C.CertificateInfo{}
+	mut ccert := &C.CertificateInfo{}
 
 	defer {
 		C.free_connection(conn)
@@ -68,15 +57,10 @@ pub fn fetch(url string) ?Response {
 		return none
 	}
 
-	res = C.get_server_cert_info(conn, cert)
+	res = C.get_server_cert_info(conn, ccert)
 	if res == -1 {
 		return none
 	}
-
-	fingerprint := unsafe { arrays.carray_to_varray[u8](cert.fingerprint, 32) }
-	expiry := unsafe { arrays.carray_to_varray[u8](cert.expiry, 16) }
-	println(fingerprint.hex())
-	println(expiry.bytestr())
 
 	res = C.write_request(conn, url_obj.str().str)
 	if res == -1 {
@@ -95,9 +79,7 @@ pub fn fetch(url string) ?Response {
 		}
 	}
 
-	code := cres.code
-	meta := unsafe { arrays.carray_to_varray[u8](cres.meta, cres.meta_len) }
-	body := unsafe { arrays.carray_to_varray[u8](cres.body, cres.body_len) }
+	resp := Response.from(cres)
 
-	return Response{code, meta.bytestr(), body}
+	return resp
 }
