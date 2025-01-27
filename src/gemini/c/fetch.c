@@ -1,4 +1,5 @@
 #include "fetch.h"
+#include <string.h>
 #include <time.h>
 
 int fetch(const char *url, Response *response) {
@@ -62,7 +63,7 @@ int fetch(const char *url, Response *response) {
     return FAIL;
   }
 
-  if (read_header(&conn, response) < 0) {
+  if (read_header(&conn, response) == FAIL) {
     free_connection(&conn);
     return FAIL;
   }
@@ -112,9 +113,8 @@ int setup_connect(char *hostname, Connection *conn) {
 
 int read_header(Connection *conn, Response *response) {
   char header[MAX_HEADER_SIZE] = {0};
-  int header_pos = 0;
+  int header_pos = 0, n;
   char c;
-  int n;
   while (header_pos < sizeof(header) - 1) {
     n = SSL_read(conn->ssl, &c, 1);
     if (n <= 0) {
@@ -125,18 +125,15 @@ int read_header(Connection *conn, Response *response) {
       break;
     }
   }
-  response->meta = malloc(MAX_HEADER_SIZE);
-  if (response->meta == NULL) {
-    return FAIL;
-  }
+
+  memset(response->meta, 0, sizeof(response->meta));
   sscanf(header, "%d %[^\r\n]", &response->code, response->meta);
   response->meta_len = strlen(response->meta);
   return response->code;
 }
 
 int read_body(Connection *conn, Response *response) {
-  int body_size = INITIAL_BUFFER_SIZE;
-  int n;
+  int body_size = INITIAL_BUFFER_SIZE, n;
   response->body = malloc(body_size);
   response->body_len = 0;
   if (response->body == NULL) {
@@ -164,7 +161,7 @@ void free_connection(Connection *conn) {
     SSL_shutdown(conn->ssl);
     SSL_free(conn->ssl);
   }
-  if (conn->sock != -1) {
+  if (conn->sock != FAIL) {
     close(conn->sock);
   }
   if (conn->ctx) {
@@ -174,7 +171,6 @@ void free_connection(Connection *conn) {
 
 void free_reponse(Response *response) {
   if (response) {
-    free(response->meta);
     free(response->body);
   }
 }

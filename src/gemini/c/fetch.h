@@ -35,7 +35,7 @@ typedef struct {
   int code;
   int meta_len;
   int body_len;
-  char *meta;
+  char meta[MAX_HEADER_SIZE];
   char *body;
 } Response;
 
