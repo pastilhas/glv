@@ -22,6 +22,7 @@ struct C.Response {
 
 @[typedef]
 struct C.CertificateInfo {
+	hostname    charptr
 	fingerprint charptr
 	expiry      charptr
 }
