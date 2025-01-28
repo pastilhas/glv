@@ -1,13 +1,13 @@
 module main
 
-import gemini
+import glvclient
 
 fn main() {
-	if resp := gemini.fetch('gemini://midnight.pub/') {
-		println('Status: ${resp.code}')
-		println('Meta: ${resp.meta}')
-		println('Body:\n${resp.body.bytestr()}')
-	} else {
-		println('Fetch failed')
-	}
+	w_width_scaled := int(1280 * 1.5)
+	w_height_scaled := int(720 * 1.5)
+	mut app := glvclient.App.new(
+		width:  w_width_scaled
+		height: w_height_scaled
+	)
+	app.main()
 }
