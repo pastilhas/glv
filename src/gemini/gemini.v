@@ -22,7 +22,7 @@ pub fn (c Certificate) str() string {
 	return '${c.hostname} ${c.fingerprint} ${c.expiry.custom_format('YYYYMMDDHHmmss')}Z'
 }
 
-pub fn Response.from(resp &C.Response) Response {
+fn Response.from(resp &C.Response) Response {
 	return Response{
 		code: resp.code
 		meta: unsafe { cstring_to_vstring(resp.meta) }
@@ -30,7 +30,7 @@ pub fn Response.from(resp &C.Response) Response {
 	}
 }
 
-pub fn Certificate.from(info &C.CertificateInfo) !Certificate {
+fn Certificate.from(info &C.CertificateInfo) !Certificate {
 	expiry_str := unsafe { cstring_to_vstring(info.expiry) }
 	return Certificate{
 		hostname:    unsafe { cstring_to_vstring(info.hostname) }
@@ -67,6 +67,10 @@ pub fn parse_url(raw string) !URL {
 	}
 
 	url.raw_query = urllib.path_escape(url.raw_query)
+
+	if url.str().len > 1024 {
+		return error('URL is too long')
+	}
 
 	return url
 }
