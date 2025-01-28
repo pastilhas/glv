@@ -1,6 +1,5 @@
 module gemini
 
-import arrays
 import net.urllib { URL }
 import time
 
@@ -20,23 +19,6 @@ pub:
 
 pub fn (c Certificate) str() string {
 	return '${c.hostname} ${c.fingerprint} ${c.expiry.custom_format('YYYYMMDDHHmmss')}Z'
-}
-
-fn Response.from(resp &C.Response) Response {
-	return Response{
-		code: resp.code
-		meta: unsafe { cstring_to_vstring(resp.meta) }
-		body: unsafe { arrays.carray_to_varray[u8](resp.body, resp.body_len) }
-	}
-}
-
-fn Certificate.from(info &C.CertificateInfo) !Certificate {
-	expiry_str := unsafe { cstring_to_vstring(info.expiry) }
-	return Certificate{
-		hostname:    unsafe { cstring_to_vstring(info.hostname) }
-		fingerprint: unsafe { arrays.carray_to_varray[u8](info.fingerprint, 32).hex() }
-		expiry:      time.parse_format(expiry_str, 'YYYYMMDDHHmmssZ')!
-	}
 }
 
 pub fn parse_url(raw string) !URL {

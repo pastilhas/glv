@@ -1,5 +1,8 @@
 module gemini
 
+import time
+import arrays
+
 #flag -lssl -lcrypto
 #flag -I @VMODROOT/src/gemini/c
 #flag @VMODROOT/src/gemini/c/fetch.o
@@ -40,3 +43,20 @@ fn C.read_body(conn &C.Connection, response &C.Response) int
 fn C.free_connection(conn &C.Connection)
 
 fn C.free_reponse(response &C.Response)
+
+fn Response.from(resp &C.Response) Response {
+	return Response{
+		code: resp.code
+		meta: unsafe { cstring_to_vstring(resp.meta) }
+		body: unsafe { arrays.carray_to_varray[u8](resp.body, resp.body_len) }
+	}
+}
+
+fn Certificate.from(info &C.CertificateInfo) !Certificate {
+	expiry_str := unsafe { cstring_to_vstring(info.expiry) }
+	return Certificate{
+		hostname:    unsafe { cstring_to_vstring(info.hostname) }
+		fingerprint: unsafe { arrays.carray_to_varray[u8](info.fingerprint, 32).hex() }
+		expiry:      time.parse_format(expiry_str, 'YYYYMMDDHHmmssZ')!
+	}
+}
