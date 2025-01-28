@@ -9,7 +9,7 @@ import arrays
 #include "fetch.h"
 
 @[typedef]
-struct C.Connection {
+struct C.SSLConnection {
 	ctx  voidptr
 	ssl  voidptr
 	sock int
@@ -30,17 +30,17 @@ struct C.CertificateInfo {
 	expiry      charptr
 }
 
-fn C.setup_connect(hostname charptr, conn &C.Connection) int
+fn C.setup_connect(hostname charptr, conn &C.SSLConnection) int
 
-fn C.write_request(conn &C.Connection, url charptr) int
+fn C.write_request(conn &C.SSLConnection, url charptr) int
 
-fn C.get_server_cert_info(conn &C.Connection, info &C.CertificateInfo) int
+fn C.get_server_cert_info(conn &C.SSLConnection, info &C.CertificateInfo) int
 
-fn C.read_header(conn &C.Connection, response &C.Response) int
+fn C.read_header(conn &C.SSLConnection, response &C.Response) int
 
-fn C.read_body(conn &C.Connection, response &C.Response) int
+fn C.read_body(conn &C.SSLConnection, response &C.Response) int
 
-fn C.free_connection(conn &C.Connection)
+fn C.free_connection(conn &C.SSLConnection)
 
 fn C.free_reponse(response &C.Response)
 

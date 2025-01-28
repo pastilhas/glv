@@ -31,7 +31,7 @@ typedef struct {
   SSL_CTX *ctx;
   SSL *ssl;
   int sock;
-} Connection;
+} SSLConnection;
 
 typedef struct {
   int code;
@@ -58,7 +58,7 @@ char *strptime(const char *__restrict s, const char *__restrict fmt, tm_t *tp);
  * @param conn The Connection struct to initialize
  * @return 0 on success, -1 on failure
  */
-int setup_connect(char *hostname, Connection *conn);
+int setup_connect(char *hostname, SSLConnection *conn);
 
 /**
  * Get certificate information from an SSL connection.
@@ -68,7 +68,7 @@ int setup_connect(char *hostname, Connection *conn);
  * @param info The CertificateInfo struct to populate
  * @return 0 on success, -1 on failure
  */
-int get_server_cert_info(Connection *conn, CertificateInfo *info);
+int get_server_cert_info(SSLConnection *conn, CertificateInfo *info);
 
 /**
  * Write a request URL to a Gemini connection.
@@ -78,7 +78,7 @@ int get_server_cert_info(Connection *conn, CertificateInfo *info);
  * @param url The URL to send in the request
  * @return 0 on success, -1 on failure
  */
-int write_request(Connection *conn, char *url);
+int write_request(SSLConnection *conn, char *url);
 
 /**
  * Read the response header from a Gemini connection.
@@ -89,7 +89,7 @@ int write_request(Connection *conn, char *url);
  * @param response The Response struct to store the header information
  * @return 0 on success, -1 on failure
  */
-int read_header(Connection *conn, Response *response);
+int read_header(SSLConnection *conn, Response *response);
 
 /**
  * Read the response body from a Gemini connection.
@@ -100,7 +100,7 @@ int read_header(Connection *conn, Response *response);
  * @param response The Response struct to store the body data
  * @return 0 on success, -1 on failure
  */
-int read_body(Connection *conn, Response *response);
+int read_body(SSLConnection *conn, Response *response);
 
 /**
  * Cleanup function for a Gemini connection.
@@ -109,7 +109,7 @@ int read_body(Connection *conn, Response *response);
  *
  * @param conn The Connection struct to cleanup
  */
-void free_connection(Connection *conn);
+void free_connection(SSLConnection *conn);
 
 /**
  * Cleanup function for a Gemini response.

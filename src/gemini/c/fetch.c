@@ -1,6 +1,6 @@
 #include "fetch.h"
 
-int setup_connect(char *hostname, Connection *conn) {
+int setup_connect(char *hostname, SSLConnection *conn) {
   struct hostent *host;
   struct sockaddr_in addr;
 
@@ -29,7 +29,7 @@ int setup_connect(char *hostname, Connection *conn) {
   return SSL_connect(conn->ssl) == 1 ? OK : FAIL;
 }
 
-int get_server_cert_info(Connection *conn, CertificateInfo *info) {
+int get_server_cert_info(SSLConnection *conn, CertificateInfo *info) {
   X509 *cert = SSL_get_peer_certificate(conn->ssl);
   if (!cert) {
     return FAIL;
@@ -90,7 +90,7 @@ int get_server_cert_info(Connection *conn, CertificateInfo *info) {
   return OK;
 }
 
-int write_request(Connection *conn, char *url) {
+int write_request(SSLConnection *conn, char *url) {
   char request[MAX_REQUEST] = {0};
   snprintf(request, sizeof(request), "%s\r\n", url);
   if (SSL_write(conn->ssl, request, strlen(request)) <= 0) {
@@ -99,7 +99,7 @@ int write_request(Connection *conn, char *url) {
   return OK;
 }
 
-int read_header(Connection *conn, Response *response) {
+int read_header(SSLConnection *conn, Response *response) {
   char header[MAX_HEADER_SIZE] = {0};
   int header_pos = 0, n;
   char c;
@@ -117,7 +117,7 @@ int read_header(Connection *conn, Response *response) {
   return OK;
 }
 
-int read_body(Connection *conn, Response *response) {
+int read_body(SSLConnection *conn, Response *response) {
   int body_size = INITIAL_BUFFER_SIZE, n;
   response->body = malloc(body_size);
   response->body_len = 0;
@@ -141,7 +141,7 @@ int read_body(Connection *conn, Response *response) {
   return OK;
 }
 
-void free_connection(Connection *conn) {
+void free_connection(SSLConnection *conn) {
   if (conn->ssl) {
     SSL_shutdown(conn->ssl);
     SSL_free(conn->ssl);
