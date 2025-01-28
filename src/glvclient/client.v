@@ -8,6 +8,7 @@ pub struct App {
 	ui.Window
 mut:
 	search_txt string
+	content    &ui.Textbox
 }
 
 pub fn App.new(cfg &ui.WindowConfig) &App {
@@ -16,6 +17,7 @@ pub fn App.new(cfg &ui.WindowConfig) &App {
 
 pub fn (mut app App) main() {
 	w_width := 1280
+	w_height := 720
 	btn_side := 30
 	z_gap := 0
 	s_gap := 5
@@ -33,16 +35,25 @@ pub fn (mut app App) main() {
 
 	mut action_btn := ui.Button.new(text: 'A')
 	action_btn.set_bounds(0, 0, btn_side, btn_side)
-	action_btn.subscribe_event('mouse_up', fn [mut app, mut search_bar] (e &ui.WindowKeyEvent) {
+	action_btn.subscribe_event('mouse_up', fn [mut app, mut search_bar] (e &ui.MouseEvent) {
 		search_bar.update_bind()
-		app.goto(e)
+		app.goto_mouse(e)
 	})
 
 	header.add_child(cert_btn)
 	header.add_child(search_bar)
 	header.add_child(action_btn)
 
-	mut content := ui.Panel.new()
+	mut content := ui.panel()
+	content.set_bounds(0, 0, w_width - 2 * s_gap, w_height - 2 * btn_side - 6 * s_gap)
+	mut content_box := ui.Textbox.new()
+	content_box.set_bounds(0, 0, w_width - 2 * s_gap, w_height - 2 * btn_side - 6 * s_gap)
+	content_box.pack = false
+	content_box.blink = false
+	content_box.not_editable = true
+	content_box.no_line_numbers = true
+	content.add_child(content_box)
+	app.content = content_box
 
 	mut footer := ui.Panel.new(layout: ui.FlowLayout.new(hgap: s_gap, vgap: s_gap))
 	footer.set_bounds(0, 0, 0, btn_side + 2 * s_gap)
@@ -62,7 +73,7 @@ pub fn (mut app App) main() {
 	app.gg.run()
 }
 
-fn (mut app App) goto(e &ui.WindowKeyEvent) {
+fn (mut app App) goto_mouse(e &ui.MouseEvent) {
 	url := app.search_txt
 	url_obj := gemini.parse_url(url) or {
 		println(err)
@@ -73,18 +84,20 @@ fn (mut app App) goto(e &ui.WindowKeyEvent) {
 		return
 	}
 
-	println('${resp.code} ${resp.meta} ${resp.body.len >> 10}KB')
-
 	domain := if cert.hostname == url_obj.hostname() {
 		'✓ Domain matches'
 	} else {
 		'✗ Domain does not match'
 	}
 	expire := if time.since(cert.expiry) < 0 {
-		'✓ Certificate not expired'
+		'✓ Certificate not expired ${cert.expiry}'
 	} else {
-		'✗ Certificate expired'
+		'✗ Certificate expired ${cert.expiry}'
 	}
+
+	println('${resp.code} ${resp.meta} ${resp.body.len >> 10}KB')
 	println(domain)
 	println(expire)
+
+	app.content.lines = resp.body.bytestr().split_into_lines()
 }
