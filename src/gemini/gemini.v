@@ -57,8 +57,8 @@ pub fn parse_url(raw string) !URL {
 	return url
 }
 
-pub fn fetch(url URL) !Response {
-	mut conn := &C.Connection{}
+pub fn fetch(url URL) !(Response, Certificate) {
+	mut conn := &C.SSLConnection{}
 	mut cres := &C.Response{}
 	mut ccert := &C.CertificateInfo{}
 
@@ -108,5 +108,5 @@ pub fn fetch(url URL) !Response {
 	}
 
 	resp := Response.from(cres)
-	return resp
+	return resp, new
 }
