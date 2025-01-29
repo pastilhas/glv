@@ -8,7 +8,7 @@ pub struct App {
 	ui.Window
 mut:
 	search_txt string
-	content    &ui.Textbox
+	content    &ContentBox
 }
 
 pub fn App.new(cfg &ui.WindowConfig) &App {
@@ -46,12 +46,11 @@ pub fn (mut app App) main() {
 
 	mut content := ui.panel()
 	content.set_bounds(0, 0, w_width - 2 * s_gap, w_height - 2 * btn_side - 6 * s_gap)
-	mut content_box := ui.Textbox.new()
+	mut content_box := ContentBox.new()
 	content_box.set_bounds(0, 0, w_width - 2 * s_gap, w_height - 2 * btn_side - 6 * s_gap)
-	content_box.pack = false
-	content_box.blink = false
-	content_box.not_editable = true
-	content_box.no_line_numbers = true
+	app.subscribe_event('key_down', fn [mut content_box] (e &ui.WindowKeyEvent) {
+		content_box.on_key_down(e)
+	})
 	content.add_child(content_box)
 	app.content = content_box
 
@@ -99,5 +98,5 @@ fn (mut app App) goto_mouse(e &ui.MouseEvent) {
 	println(domain)
 	println(expire)
 
-	app.content.lines = resp.body.bytestr().split_into_lines()
+	app.content.text = resp.body.bytestr()
 }
