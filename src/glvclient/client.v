@@ -46,7 +46,10 @@ pub fn (mut app App) main() {
 
 	mut content := ui.panel()
 	content.set_bounds(0, 0, w_width - 2 * s_gap, w_height - 2 * btn_side - 6 * s_gap)
-	mut content_box := ContentBox.new()
+	mut content_box := ContentBox.new(
+		font_size:     app.graphics_context.font_size
+		max_font_size: 3 * app.graphics_context.font_size
+	)
 	content_box.set_bounds(0, 0, w_width - 2 * s_gap, w_height - 2 * btn_side - 6 * s_gap)
 	app.subscribe_event('key_down', fn [mut content_box] (e &ui.WindowKeyEvent) {
 		content_box.on_key_down(e)
@@ -98,5 +101,7 @@ fn (mut app App) goto_mouse(e &ui.MouseEvent) {
 	println(domain)
 	println(expire)
 
-	app.content.text = resp.body.bytestr()
+	if resp.meta.starts_with('text') {
+		app.content.set_text(resp.body.bytestr())
+	}
 }
