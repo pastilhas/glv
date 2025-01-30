@@ -7,8 +7,8 @@ import time
 pub struct App {
 	ui.Window
 mut:
-	search_txt string
 	content    &ContentBox
+	search_bar &ui.TextField = unsafe { nil }
 }
 
 pub fn App.new(cfg &ui.WindowConfig) &App {
@@ -31,14 +31,10 @@ pub fn (mut app App) main() {
 
 	mut search_bar := ui.text_field()
 	search_bar.set_bounds(0, 0, w_width - 2 * btn_side - 4 * s_gap, btn_side)
-	search_bar.bind_to(app.search_txt)
+	app.search_bar = search_bar
 
 	mut action_btn := ui.Button.new(text: 'A')
 	action_btn.set_bounds(0, 0, btn_side, btn_side)
-	action_btn.subscribe_event('mouse_up', fn [mut app, mut search_bar] (e &ui.MouseEvent) {
-		search_bar.update_bind()
-		app.goto_mouse(e)
-	})
 
 	header.add_child(cert_btn)
 	header.add_child(search_bar)
@@ -47,13 +43,13 @@ pub fn (mut app App) main() {
 	mut content := ui.panel()
 	content.set_bounds(0, 0, w_width - 2 * s_gap, w_height - 2 * btn_side - 6 * s_gap)
 	mut content_box := ContentBox.new(
+		ctx:           app.graphics_context
+		justify:       true
 		font_size:     app.graphics_context.font_size
-		max_font_size: 3 * app.graphics_context.font_size
+		max_font_size: 2 * app.graphics_context.font_size
 	)
 	content_box.set_bounds(0, 0, w_width - 2 * s_gap, w_height - 2 * btn_side - 6 * s_gap)
-	app.subscribe_event('key_down', fn [mut content_box] (e &ui.WindowKeyEvent) {
-		content_box.on_key_down(e)
-	})
+
 	content.add_child(content_box)
 	app.content = content_box
 
@@ -72,11 +68,30 @@ pub fn (mut app App) main() {
 	main_panel.add_child_with_flag(footer, ui.borderlayout_south)
 
 	app.add_child(main_panel)
+
+	app.subscribe_event('key_down', fn [mut app, mut content_box] (e &ui.WindowKeyEvent) {
+		app.on_key_down(e)
+		content_box.on_key_down(e)
+	})
+	action_btn.subscribe_event('mouse_up', fn [mut app] (e &ui.MouseEvent) {
+		app.goto_mouse(e)
+	})
+
 	app.gg.run()
 }
 
 fn (mut app App) goto_mouse(e &ui.MouseEvent) {
-	url := app.search_txt
+	app.goto()
+}
+
+fn (mut app App) on_key_down(e &ui.WindowKeyEvent) {
+	if e.key == .enter || e.key == .kp_enter {
+		app.goto()
+	}
+}
+
+fn (mut app App) goto() {
+	url := app.search_bar.text
 	url_obj := gemini.parse_url(url) or {
 		println(err)
 		return
