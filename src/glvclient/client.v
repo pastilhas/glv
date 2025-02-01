@@ -8,11 +8,14 @@ pub struct App {
 	ui.Window
 mut:
 	content    &TextBox
+	history    History
 	search_bar &ui.TextField = unsafe { nil }
 }
 
 pub fn App.new(cfg &ui.WindowConfig) &App {
-	return &App(ui.Window.new(cfg))
+	mut app := &App(ui.Window.new(cfg))
+	app.history = History.new(cap: -1)
+	return app
 }
 
 pub fn (mut app App) main() {
@@ -35,14 +38,22 @@ pub fn (mut app App) main() {
 	header.add_child(search_bar)
 	header.add_child(rbtn)
 
-	footer_buttons := ['<', '>', 'H', 'B', 'S']
 	mut footer := ui.Panel.new(layout: ui.FlowLayout.new(ui.FlowLayoutConfig{0, 0}))
 	footer.set_bounds(0, 0, w_width, unit)
-	for btn_text in footer_buttons {
-		mut btn := ui.Button.new(text: btn_text)
-		btn.set_bounds(0, 0, unit, unit)
-		footer.add_child(btn)
-	}
+
+	mut back_btn := ui.Button.new(text: '<')
+	back_btn.set_bounds(0, 0, unit, unit)
+	mut frwd_btn := ui.Button.new(text: '>')
+	frwd_btn.set_bounds(0, 0, unit, unit)
+	// mut back_btn := ui.Button.new(text: '<')
+	// back_btn.set_bounds(0, 0, unit, unit)
+	// mut back_btn := ui.Button.new(text: '<')
+	// back_btn.set_bounds(0, 0, unit, unit)
+	// mut back_btn := ui.Button.new(text: '<')
+	// back_btn.set_bounds(0, 0, unit, unit)
+
+	footer.add_child(back_btn)
+	footer.add_child(frwd_btn)
 
 	mut content := ui.Panel.new()
 	content.set_bounds(0, 0, w_width, w_height - 2 * unit)
@@ -92,6 +103,16 @@ pub fn (mut app App) main() {
 		app.on_mouse_up(e)
 	})
 
+	back_btn.subscribe_event('mouse_up', fn [mut app] (e &ui.MouseEvent) {
+		resp := app.history.back() or { return }
+		app.load(resp)
+	})
+
+	frwd_btn.subscribe_event('mouse_up', fn [mut app] (e &ui.MouseEvent) {
+		resp := app.history.frwd() or { return }
+		app.load(resp)
+	})
+
 	app.gg.run()
 }
 
@@ -134,6 +155,11 @@ fn (mut app App) goto() {
 	println(domain)
 	println(expire)
 
+	app.history.add(resp)
+	app.load(resp)
+}
+
+fn (mut app App) load(resp gemini.Response) {
 	if resp.meta.starts_with('text') {
 		app.content.set_text(resp.body.bytestr())
 	}
