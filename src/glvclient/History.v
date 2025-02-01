@@ -36,7 +36,6 @@ pub fn (mut this History) add(response gemini.Response) {
 	}
 
 	this.cache << response
-	dump(this.cache.last())
 	this.pointer = this.cache.len - 1
 }
 
