@@ -24,7 +24,7 @@ pub fn TextBox.new(ctx &ui.GraphicsContext, px int, py int) &TextBox {
 		py:  py
 	}
 	this.update = fn [mut this] () {
-		this.update_view()
+		this.form_text()
 	}
 	return this
 }
@@ -32,10 +32,6 @@ pub fn TextBox.new(ctx &ui.GraphicsContext, px int, py int) &TextBox {
 pub fn (mut this TextBox) set_text(text string) {
 	this.scroll = 0
 	this.text = text
-	this.form_text()
-}
-
-fn (mut this TextBox) update_view() {
 	this.form_text()
 }
 
