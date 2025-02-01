@@ -51,9 +51,10 @@ pub fn (mut app App) main() {
 
 	mut content := ui.Panel.new()
 	content.set_bounds(main_panel.x, main_panel.y, main_panel.width, main_panel.height - header.height - footer.height)
-	mut content_box := TextBox.new(app.graphics_context, 5, 5,
+	mut content_box := TextBox.new(app.graphics_context, 'assets/NotoEmoji-VariableFont_wght.ttf',
+		5, 5,
 		x:      content.x
-		y:      content.y - 5
+		y:      content.y - 9
 		width:  content.width
 		height: content.height
 	)
@@ -71,6 +72,9 @@ pub fn (mut app App) main() {
 	app.subscribe_event('key_down', fn [mut app, mut content_box] (e &ui.WindowKeyEvent) {
 		app.on_key_down(e)
 		content_box.on_key_down(e)
+	})
+	content_box.subscribe_event('mouse_down', fn [mut content_box] (e &ui.MouseEvent) {
+		content_box.on_mouse_down(e)
 	})
 	content_box.subscribe_event('mouse_up', fn [mut content_box] (e &ui.MouseEvent) {
 		content_box.on_mouse_up(e)

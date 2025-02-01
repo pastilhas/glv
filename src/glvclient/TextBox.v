@@ -13,6 +13,7 @@ pub mut:
 	text      string
 	lines     []Line = []Line{}
 	font_size int    = 60
+	emojier   &EmojiDrawer
 	pressed   ?&Line
 }
 
@@ -38,13 +39,14 @@ const link_visited = gx.hex(0x5b00ff)
 
 pub fn TextBox.new(ctx &ui.GraphicsContext, font string, px int, py int, bounds ui.Bounds) &TextBox {
 	mut this := &TextBox{
-		ctx:    ctx
-		px:     px
-		py:     py
-		x:      bounds.x
-		y:      bounds.y
-		width:  bounds.width
-		height: bounds.height
+		ctx:     ctx
+		px:      px
+		py:      py
+		x:       bounds.x
+		y:       bounds.y
+		width:   bounds.width
+		height:  bounds.height
+		emojier: EmojiDrawer.new(font)
 	}
 	this.update = fn [mut this] () {
 		this.update_view()
@@ -234,6 +236,8 @@ fn (mut this TextBox) draw(ctx &ui.GraphicsContext) {
 			}
 		}
 	}
+
+	// this.emojier.draw_emoji(ctx.gg, '🥰', 100, 100, this.font_size)
 }
 
 fn (mut this TextBox) get_hovered_line(mouse_y int) ?&Line {

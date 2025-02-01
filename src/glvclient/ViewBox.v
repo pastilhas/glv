@@ -15,7 +15,7 @@ pub mut:
 }
 
 fn (mut this ViewBox) scroll(scroll f32) {
-	this.scroll = clip(this.scroll + scroll, -0.01, 1.01)
+	this.scroll = clip(this.scroll + scroll, 0, 1)
 }
 
 fn (mut this ViewBox) zoom(zoom f32) {
