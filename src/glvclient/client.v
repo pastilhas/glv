@@ -18,51 +18,60 @@ pub fn App.new(cfg &ui.WindowConfig) &App {
 pub fn (mut app App) main() {
 	w_width := 1280
 	w_height := 720
+	unit := 30
 
 	mut main_panel := ui.Panel.new(layout: ui.FlowLayout.new(ui.FlowLayoutConfig{0, 0}))
 	main_panel.set_bounds(0, 0, w_width, w_height)
 	mut header := ui.Panel.new(layout: ui.FlowLayout.new(ui.FlowLayoutConfig{0, 0}))
-	header.set_bounds(main_panel.x, main_panel.y, main_panel.width, 30)
-	mut lbtn := ui.Button.new(
-		text:   'C'
-		bounds: ui.Bounds{header.x, header.y, header.height, header.height}
-	)
-	mut rbtn := ui.Button.new(
-		text:   'A'
-		bounds: ui.Bounds{header.x, header.y, header.height, header.height}
-	)
-	mut search_bar := ui.TextField.new(
-		bounds: ui.Bounds{header.x, header.y, header.width - lbtn.width - rbtn.width, header.height}
-	)
+	header.set_bounds(0, 0, w_width, unit)
+	mut lbtn := ui.Button.new(text: 'C')
+	lbtn.set_bounds(0, 0, unit, unit)
+	mut rbtn := ui.Button.new(text: 'A')
+	rbtn.set_bounds(0, 0, unit, unit)
+	mut search_bar := ui.TextField.new()
+	search_bar.set_bounds(0, 0, w_width - 2 * unit, unit)
 
 	header.add_child(lbtn)
 	header.add_child(search_bar)
 	header.add_child(rbtn)
 
-	mut footer := ui.Panel.new(layout: ui.FlowLayout.new(ui.FlowLayoutConfig{0, 0}))
-	footer.set_bounds(main_panel.x, main_panel.y, main_panel.width, header.height)
-
 	footer_buttons := ['<', '>', 'H', 'B', 'S']
+	mut footer := ui.Panel.new(layout: ui.FlowLayout.new(ui.FlowLayoutConfig{0, 0}))
+	footer.set_bounds(0, 0, w_width, unit)
 	for btn_text in footer_buttons {
 		mut btn := ui.Button.new(text: btn_text)
-		btn.set_bounds(footer.x, footer.y, footer.height, footer.height)
+		btn.set_bounds(0, 0, unit, unit)
 		footer.add_child(btn)
 	}
 
 	mut content := ui.Panel.new()
-	content.set_bounds(main_panel.x, main_panel.y, main_panel.width, main_panel.height - header.height - footer.height)
-	mut content_box := TextBox.new(app.graphics_context, 'assets/NotoEmoji-VariableFont_wght.ttf',
-		5, 5,
-		x:      content.x
-		y:      content.y - 9
-		width:  content.width
-		height: content.height
-	)
+	content.set_bounds(0, 0, w_width, w_height - 2 * unit)
+	mut content_box := TextBox.new(app.graphics_context, 5, 10 + 2 * unit)
+	content_box.set_bounds(0, 0, w_width, content.height)
+
+	content_box.emojier = EmojiDrawer.new('assets/NotoEmoji-VariableFont_wght.ttf')
+	content_box.on_link_click = fn [mut app] (link string) {
+		if link.starts_with('gemini://') {
+			app.search_bar.text = link
+			app.goto()
+			return
+		}
+
+		if link.contains('://') {
+			println('No support for other protocols')
+			return
+		}
+
+		app.search_bar.text = app.search_bar.text.trim_right('/') + '/' + link.trim_left('/')
+		println('goto: ${app.search_bar.text}')
+		app.goto()
+	}
+
 	content.add_child(content_box)
 
 	main_panel.add_child(header)
-	main_panel.add_child(content)
 	main_panel.add_child(footer)
+	main_panel.add_child(content)
 
 	app.add_child(main_panel)
 
@@ -98,6 +107,8 @@ fn (mut app App) on_key_down(e &ui.WindowKeyEvent) {
 
 fn (mut app App) goto() {
 	app.search_bar.is_selected = false
+	app.search_bar.blinked = false
+	app.search_bar.carrot_left = app.search_bar.text.len
 	url := app.search_bar.text
 	url_obj := gemini.parse_url(url) or {
 		println(err)
