@@ -3,7 +3,25 @@ module glvclient
 import gx
 import iui as ui
 
-type GemLine = TextLine | LinkLine | PreformatToggle | HeadingLine | ListLine | QuoteLine
+type GemLine = TextLine | LinkLine | PreformatToggle | Heading | ListItem | QuoteLine
+
+/*
+  document         = 1*line
+  line             = text-line / link-line / preformat-toggle / heading / list-item / quote-line
+  text-line        = *(WSP / VCHAR) CRLF
+  link-line        = "=>" *WSP URI [WSP VCHAR 1*(WSP / VCHAR)] CRLF
+  heading          = ( "#" / "##" / "###" ) SP text-line
+  list-item        = "*" SP text-line
+  quote-line       = ">" text-line
+  preformat-toggle = "```" text-line
+
+  URI              = scheme ":" hier-part [ "?" query ] [ "#" fragment ] ; STD66
+  CRLF             =  %d13.10
+  SP               =  %x20
+  HTAB             =  %x09
+  WSP              =  SP / HTAB
+  VCHAR            =  UTF8-char ; STD63
+*/
 
 struct TextLine {
 mut:
@@ -24,15 +42,17 @@ mut:
 
 struct PreformatToggle {
 	TextLine
+mut:
+	meta string
 }
 
-struct HeadingLine {
+struct Heading {
 	TextLine
 mut:
 	type u8
 }
 
-struct ListLine {
+struct ListItem {
 	TextLine
 }
 
@@ -53,7 +73,9 @@ fn from_gemtext(text string, size int, width int, indent int, ctx &ui.GraphicsCo
 
 		if line.starts_with('```') {
 			mono = !mono
-			res << PreformatToggle{}
+			res << PreformatToggle{
+				meta: line[3..].trim_space()
+			}
 			continue
 		}
 
@@ -65,10 +87,14 @@ fn from_gemtext(text string, size int, width int, indent int, ctx &ui.GraphicsCo
 
 		if line.starts_with('=>') {
 			mut link := line[2..].trim_space()
-			mut meta := link.clone()
+			mut meta := link
 
-			if link.index_u8(` `) >= 0 {
-				link, meta = link.split_once(' ') or { panic('malformed') }
+			for i, c in link {
+				if c.is_space() {
+					meta = link[i..].trim_space()
+					link = link[..i]
+					break
+				}
 			}
 
 			res << LinkLine{TextLine{0, y, size, gx.blue, meta}, link, false, false}
@@ -77,19 +103,21 @@ fn from_gemtext(text string, size int, width int, indent int, ctx &ui.GraphicsCo
 		}
 
 		if line.starts_with('#') {
-			mut l := line[1..]
-			mut type := u8(1)
-			if line.len > 1 && line[1] == `#` {
-				l = l[1..]
-				type += 1
-			}
-			if line.len > 2 && line[2] == `#` {
-				l = l[1..]
-				type += 1
+			mut type := u8(0)
+			mut i := 0
+			for i < line.len && i < 3 && line[i] == `#` {
+				type++
+				i++
 			}
 
-			l = l.trim_space()
-			res << HeadingLine{TextLine{0, y, size + 1 - int(0.25 * f32(type)), gx.dark_blue, l}, type}
+			hsize := match type {
+				1 { 2.0 }
+				2 { 1.5 }
+				else { 1.17 }
+			}
+
+			head := line[i..].trim_space()
+			res << Heading{TextLine{0, y, int(size * hsize), gx.dark_blue, head}, type}
 			y += size + 1 - int(0.25 * f32(type))
 			continue
 		}
@@ -98,7 +126,7 @@ fn from_gemtext(text string, size int, width int, indent int, ctx &ui.GraphicsCo
 			mut w_lines := wrap_line(line[1..].trim_space(), size, width - indent, ctx)
 			w_lines[0] = '- ' + w_lines[0]
 			for w_line in w_lines {
-				res << ListLine{TextLine{indent, y, size, gx.black, w_line}}
+				res << ListItem{TextLine{indent, y, size, gx.black, w_line}}
 				y += size
 			}
 			continue
@@ -175,8 +203,8 @@ fn draw_lines(x int, y int, lines []GemLine, view_height int, hover int, ctx &ui
 			PreformatToggle {
 				mono = !mono
 			}
-			HeadingLine {}
-			ListLine {}
+			Heading {}
+			ListItem {}
 			QuoteLine {}
 		}
 

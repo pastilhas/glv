@@ -2,12 +2,15 @@ module gemini
 
 import net.urllib { URL }
 import time
+import arrays
 
 pub struct Response {
 pub:
-	code int
-	meta string
-	body []u8
+	code        int
+	meta        string
+	body        []u8
+	request     URL
+	certificate Certificate
 }
 
 pub struct Certificate {
@@ -57,7 +60,7 @@ pub fn parse_url(raw string) !URL {
 	return url
 }
 
-pub fn fetch(url URL) !(Response, Certificate) {
+pub fn fetch(url URL) !Response {
 	mut conn := &C.SSLConnection{}
 	mut cres := &C.Response{}
 	mut ccert := &C.CertificateInfo{}
@@ -107,6 +110,13 @@ pub fn fetch(url URL) !(Response, Certificate) {
 		}
 	}
 
-	resp := Response.from(cres)
-	return resp, new
+	resp := Response{
+		code:        cres.code
+		meta:        unsafe { cstring_to_vstring(cres.meta) }
+		body:        unsafe { arrays.carray_to_varray[u8](cres.body, cres.body_len) }
+		request:     url
+		certificate: new
+	}
+
+	return resp
 }

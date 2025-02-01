@@ -14,7 +14,7 @@ mut:
 
 pub fn App.new(cfg &ui.WindowConfig) &App {
 	mut app := &App(ui.Window.new(cfg))
-	app.history = History.new(cap: -1)
+	app.history = History.new()
 	return app
 }
 
@@ -135,31 +135,39 @@ fn (mut app App) goto() {
 		println(err)
 		return
 	}
-	resp, cert := gemini.fetch(url_obj) or {
+	resp := gemini.fetch(url_obj) or {
 		println(err)
 		return
 	}
 
-	domain := if cert.hostname == url_obj.hostname() {
-		'✓ Domain matches'
+	domain := if resp.certificate.hostname == url_obj.hostname() {
+		'✓ Domain matches ${url_obj.hostname()}'
 	} else {
-		'✗ Domain does not match'
+		'✗ Domain does not match ${resp.certificate.hostname} ${url_obj.hostname()}'
 	}
-	expire := if time.since(cert.expiry) < 0 {
-		'✓ Certificate not expired ${cert.expiry}'
+	expire := if time.since(resp.certificate.expiry) < 0 {
+		'✓ Certificate not expired ${resp.certificate.expiry.ymmdd()}'
 	} else {
-		'✗ Certificate expired ${cert.expiry.ymmdd()}'
+		'✗ Certificate expired ${resp.certificate.expiry.ymmdd()}'
 	}
 
 	println('${resp.code} ${resp.meta} ${resp.body.len >> 10}KB')
 	println(domain)
 	println(expire)
 
-	app.history.add(resp)
-	app.load(resp)
+	match resp.code / 10 {
+		2 {
+			app.history.add(resp)
+			app.load(resp)
+		}
+		else {}
+	}
 }
 
 fn (mut app App) load(resp gemini.Response) {
+	app.search_bar.text = resp.request.str()
+	app.search_bar.carrot_left = app.search_bar.text.len
+
 	if resp.meta.starts_with('text') {
 		app.content.set_text(resp.body.bytestr())
 	}
